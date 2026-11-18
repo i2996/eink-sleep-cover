@@ -25,6 +25,17 @@ object TitleFinder {
         Regex("""^(제\s*)?\d+\s*(장|부|화|권|편)\b"""),
         Regex("""^(chapter|part|prologue|epilogue)\b""", RegexOption.IGNORE_CASE),
         Regex("""^(프롤로그|에필로그|들어가며|들어가는 말|머리말|차례|서문|추천사)"""),
+        // 책 앞뒤에 붙는 쪽 이름 (전자책 소제목으로 자주 보임)
+        Regex(
+            """^(속\s*표지|겉\s*표지|앞\s*표지|뒤\s*표지|표지|판권|판권\s*면|판권\s*페이지|저작권|목차|일러두기|""" +
+                """감사의\s*말|작가의\s*말|지은이의\s*말|옮긴이의\s*말|역자\s*후기|저자\s*소개|작가\s*소개|""" +
+                """해설|부록|참고\s*문헌|미주|주석|찾아보기|색인|발문|헌사|본문|시작하며|마치며|나가며)\s*$"""
+        ),
+        Regex(
+            """^(cover|title\s*page|half\s*title|copyright|contents|table\s*of\s*contents|dedication|""" +
+                """acknowledg(e)?ments|about\s*the\s*author|index|notes|introduction|preface|foreword|appendix)\s*$""",
+            RegexOption.IGNORE_CASE,
+        ),
     )
 
     private val SPACES = Regex("""\s+""")

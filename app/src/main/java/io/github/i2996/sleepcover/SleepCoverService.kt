@@ -57,6 +57,7 @@ class SleepCoverService : AccessibilityService() {
             }
         }
         if (!isReader) return
+        maybeCheckUpdate()
         if (currentPkg != pkg) currentActivity = null
         currentPkg = pkg
         if (!scanScheduled) {
@@ -69,6 +70,28 @@ class SleepCoverService : AccessibilityService() {
     private fun isOverlay(pkg: String) =
         pkg == packageName || pkg == "android" ||
             listOf("systemui", "inputmethod", "keyboard", "honeyboard").any { it in pkg }
+
+    /** 책을 읽는 중 하루에 한 번 새 버전을 확인하고, 있으면 알려 준다. */
+    private fun maybeCheckUpdate() {
+        val now = System.currentTimeMillis()
+        if (now - Prefs.lastUpdateCheck(this) < 24 * 60 * 60 * 1000L) return
+        Prefs.setLastUpdateCheck(this, now)
+        val ctx = applicationContext
+        Thread {
+            val v = try {
+                Updater.newerVersion(ctx)
+            } catch (e: Exception) {
+                // 와이파이 없을 때 등: 1시간 뒤 다시 확인
+                Prefs.setLastUpdateCheck(ctx, now - 23 * 60 * 60 * 1000L)
+                null
+            }
+            if (v != null) {
+                main.post {
+                    Toast.makeText(ctx, "슬립 표지 새 버전 #$v 이 있어요. 앱을 열면 업데이트할 수 있어요.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
 
     private fun unlock() {
         lockedPkg = null

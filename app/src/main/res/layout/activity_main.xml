@@ -19,6 +19,13 @@
             android:textSize="15sp" />
 
         <Button
+            android:id="@+id/btnUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="업데이트 확인" />
+
+        <Button
             android:id="@+id/btnStorage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

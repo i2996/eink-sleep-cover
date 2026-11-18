@@ -66,6 +66,10 @@ object Prefs {
     fun attempted(c: Context): String = sp(c).getString("attempted", "")!!
     fun setAttempted(c: Context, v: String) = sp(c).edit().putString("attempted", v).apply()
 
+    /** 업데이트를 마지막으로 확인한 시각 (System.currentTimeMillis). */
+    fun lastUpdateCheck(c: Context) = sp(c).getLong("lastUpdateCheck", 0L)
+    fun setLastUpdateCheck(c: Context, v: Long) = sp(c).edit().putLong("lastUpdateCheck", v).apply()
+
     /** 슬립 이미지로 마지막으로 저장한 책 제목. */
     fun applied(c: Context): String = sp(c).getString("applied", "")!!
     fun setApplied(c: Context, v: String) = sp(c).edit().putString("applied", v).apply()

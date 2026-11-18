@@ -74,6 +74,9 @@ class MainActivity : Activity() {
         editFolder.setText(Prefs.folder(this))
         editKey.setText(Prefs.ttbKey(this))
 
+        findViewById<Button>(R.id.btnUpdate).setOnClickListener { checkUpdate(manual = true) }
+        if (savedInstanceState == null) checkUpdate(manual = false)
+
         btnStorage.setOnClickListener { requestStorage() }
         btnA11y.setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         // Boox처럼 앱 정보 화면을 바꿔 놓은 기기에서도 안드로이드 원래 화면(⋮ 메뉴 있음)을 연다.
@@ -161,7 +164,7 @@ class MainActivity : Activity() {
         val a11y = a11yEnabled()
         val device = if (Prefs.isCrema()) "크레마" else "${Build.MANUFACTURER} ${Build.MODEL}"
         status.text = buildString {
-            append("기기: $device\n")
+            append("기기: $device · 버전 #${Updater.currentVersion(this@MainActivity)}\n")
             append(if (storage) "✓ 저장 권한 있음\n" else "✗ 저장 권한 필요\n")
             append(if (a11y) "✓ 접근성 서비스 켜짐" else "✗ 접근성 서비스 꺼짐 (자동 감지 안 됨)")
         }
@@ -331,6 +334,44 @@ class MainActivity : Activity() {
                 null
             }
             main.post { if (!isFinishing) preview.setImageBitmap(bmp) }
+        }.start()
+    }
+
+    /** 새 버전이 있으면 물어보고 설치한다. manual=false(앱 열 때)면 새 버전이 없거나 실패해도 조용히 넘어간다. */
+    private fun checkUpdate(manual: Boolean) {
+        if (manual) toast("업데이트 확인 중…")
+        val ctx = applicationContext
+        Thread {
+            val r = runCatching { Updater.newerVersion(ctx) }
+            main.post {
+                if (isFinishing) return@post
+                r.onSuccess { v ->
+                    if (v == null) {
+                        if (manual) toast("최신 버전이에요 (#${Updater.currentVersion(ctx)})")
+                    } else {
+                        AlertDialog.Builder(this)
+                            .setTitle("새 버전 #$v")
+                            .setMessage("지금 업데이트할까요? 설정은 그대로 남아요.")
+                            .setPositiveButton("업데이트") { _, _ -> installUpdate() }
+                            .setNegativeButton("나중에", null)
+                            .show()
+                    }
+                }.onFailure { if (manual) toast("확인 실패: ${it.message}") }
+            }
+        }.start()
+    }
+
+    private fun installUpdate() {
+        if (!Updater.canInstall(this)) {
+            toast("‘이 출처 허용’을 켜고 돌아와서 다시 눌러 주세요")
+            Updater.openInstallPermission(this)
+            return
+        }
+        toast("새 버전 받는 중…")
+        val ctx = applicationContext
+        Thread {
+            val r = runCatching { Updater.downloadAndInstall(ctx) }
+            r.exceptionOrNull()?.let { e -> main.post { toast("업데이트 실패: ${e.message}") } }
         }.start()
     }
 

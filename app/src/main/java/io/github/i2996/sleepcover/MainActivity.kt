@@ -102,6 +102,16 @@ class MainActivity : Activity() {
                 search(d.first)
             }
         }
+        findViewById<Button>(R.id.btnClearRules).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setMessage("'제목 맞음'/'아님'으로 가르친 내용을 모두 지울까요?")
+                .setPositiveButton("초기화") { _, _ ->
+                    Prefs.clearRules(this)
+                    refresh()
+                }
+                .setNegativeButton("취소", null)
+                .show()
+        }
         findViewById<Button>(R.id.btnClearCache).setOnClickListener {
             AlertDialog.Builder(this)
                 .setMessage("기기에 보관된 표지를 모두 지울까요?\n(지금 슬립 화면 이미지는 그대로 둬요)")
@@ -180,7 +190,70 @@ class MainActivity : Activity() {
         detectedText.text = if (d == null) "아직 감지된 제목이 없어요. 독서 앱에서 책을 열고 메뉴(상단바)를 한 번 띄워 보세요."
         else "최근 감지된 제목: ${d.first}\n(${appLabel(d.second) ?: d.second})"
 
+        showRecent()
         loadPreview()
+    }
+
+    /** 감지 기록과 '제목 맞음 / 아님' 버튼. */
+    private fun showRecent() {
+        val list = findViewById<LinearLayout>(R.id.recentList)
+        list.removeAllViews()
+        val titles = Prefs.titleKeys(this)
+        val blocks = Prefs.blockKeys(this)
+        val recent = Prefs.recent(this)
+        if (recent.isEmpty()) {
+            list.addView(TextView(this).apply {
+                text = "아직 기록이 없어요."
+                setTextColor(Color.DKGRAY)
+            })
+            return
+        }
+        for ((pkg, viewId, text) in recent) {
+            val idK = TitleFinder.idKey(pkg, viewId)
+            val state = when {
+                viewId.isNotEmpty() && idK in titles -> " ✓제목 자리"
+                TitleFinder.textKey(pkg, text) in blocks || (viewId.isNotEmpty() && idK in blocks) -> " ✗막음"
+                else -> ""
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(6), 0, dp(6))
+            }
+            row.addView(TextView(this).apply {
+                setTextColor(Color.BLACK)
+                textSize = 15f
+                this.text = "$text$state\n" + (appLabel(pkg) ?: pkg) +
+                    (if (viewId.isNotEmpty()) " · ${viewId.substringAfter('/')}" else "")
+            })
+            val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            buttons.addView(Button(this).apply {
+                this.text = "제목 맞음"
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setOnClickListener {
+                    if (viewId.isEmpty()) {
+                        toast("이 앱은 자리 정보가 없어 고정할 수 없어요. 표지는 검색해서 골라 주세요.")
+                    } else {
+                        Prefs.markTitle(this@MainActivity, pkg, viewId)
+                        toast("이 앱은 앞으로 이 자리만 책 제목으로 봐요")
+                    }
+                    Prefs.setAttempted(this@MainActivity, "")
+                    editQuery.setText(text)
+                    search(text)
+                    showRecent()
+                }
+            })
+            buttons.addView(Button(this).apply {
+                this.text = "아님"
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setOnClickListener {
+                    Prefs.markNotTitle(this@MainActivity, pkg, viewId, text)
+                    toast("‘$text’ 자리는 이제 제목으로 안 봐요")
+                    showRecent()
+                }
+            })
+            row.addView(buttons)
+            list.addView(row)
+        }
     }
 
     private fun appLabel(pkg: String): String? = try {

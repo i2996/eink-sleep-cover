@@ -66,6 +66,53 @@ object Prefs {
     fun attempted(c: Context): String = sp(c).getString("attempted", "")!!
     fun setAttempted(c: Context, v: String) = sp(c).edit().putString("attempted", v).apply()
 
+    /** 사용자가 "제목 맞음"으로 고정한 자리들 (TitleFinder.idKey 형식). */
+    fun titleKeys(c: Context): Set<String> = sp(c).getStringSet("titleKeys", emptySet())!!.toSet()
+
+    /** 사용자가 "아님"으로 막은 자리/글자들. */
+    fun blockKeys(c: Context): Set<String> = sp(c).getStringSet("blockKeys", emptySet())!!.toSet()
+
+    fun markTitle(c: Context, pkg: String, viewId: String) {
+        val key = TitleFinder.idKey(pkg, viewId)
+        // 한 앱에 고정 자리는 하나만 둔다.
+        val titles = titleKeys(c).filterNot { it.startsWith("$pkg|") }.toSet() + key
+        sp(c).edit()
+            .putStringSet("titleKeys", HashSet(titles))
+            .putStringSet("blockKeys", HashSet(blockKeys(c) - key))
+            .apply()
+    }
+
+    fun markNotTitle(c: Context, pkg: String, viewId: String, text: String) {
+        // 화면 요소 이름이 "title" 같은 공용 이름이면 진짜 제목까지 막힐 수 있어 글자로 막는다.
+        val key = if (viewId.isNotEmpty() && !viewId.lowercase().endsWith("/title")) {
+            TitleFinder.idKey(pkg, viewId)
+        } else {
+            TitleFinder.textKey(pkg, text)
+        }
+        sp(c).edit()
+            .putStringSet("blockKeys", HashSet(blockKeys(c) + key))
+            .putStringSet("titleKeys", HashSet(titleKeys(c) - key))
+            .apply()
+    }
+
+    fun clearRules(c: Context) =
+        sp(c).edit().remove("titleKeys").remove("blockKeys").apply()
+
+    /** 최근 감지 기록: "pkg\tviewId\ttext" 줄들, 최신이 앞. */
+    fun recent(c: Context): List<Triple<String, String, String>> =
+        sp(c).getString("recent", "")!!.lines().filter { it.isNotBlank() }.mapNotNull {
+            val p = it.split('\t')
+            if (p.size == 3) Triple(p[0], p[1], p[2]) else null
+        }
+
+    fun addRecent(c: Context, pkg: String, viewId: String, text: String) {
+        val line = listOf(pkg, viewId, text).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ') }
+        val old = sp(c).getString("recent", "")!!.lines().filter { it.isNotBlank() }
+        if (old.firstOrNull() == line) return
+        val lines = (listOf(line) + old.filter { it != line }).take(12)
+        sp(c).edit().putString("recent", lines.joinToString("\n")).apply()
+    }
+
     /** 업데이트를 마지막으로 확인한 시각 (System.currentTimeMillis). */
     fun lastUpdateCheck(c: Context) = sp(c).getLong("lastUpdateCheck", 0L)
     fun setLastUpdateCheck(c: Context, v: Long) = sp(c).edit().putLong("lastUpdateCheck", v).apply()

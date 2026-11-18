@@ -106,8 +106,12 @@ class SleepCoverService : AccessibilityService() {
             null
         } ?: return
         if (root.packageName?.toString() != pkg) return
-        val title = TitleFinder.find(root, resources.displayMetrics.heightPixels) ?: return
+        val found = TitleFinder.find(
+            root, resources.displayMetrics.heightPixels, pkg, Prefs.titleKeys(this), Prefs.blockKeys(this)
+        ) ?: return
+        val title = found.text
         Prefs.setDetected(this, title, pkg)
+        Prefs.addRecent(this, pkg, found.viewId, title)
         if (!Prefs.auto(this)) return
         if (lockedPkg == pkg) return
         if (title == Prefs.attempted(this) || title == pendingTitle) return

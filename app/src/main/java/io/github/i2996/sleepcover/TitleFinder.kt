@@ -40,8 +40,26 @@ object TitleFinder {
 
     private val SPACES = Regex("""\s+""")
 
-    fun find(root: AccessibilityNodeInfo, screenH: Int): String? {
-        var best: String? = null
+    /** 화면에서 고른 제목 후보. [viewId]는 앱이 붙인 화면 요소 이름(없을 수 있음). */
+    data class Candidate(val text: String, val viewId: String)
+
+    /** 사용자가 가르친 규칙의 키. 화면 요소 이름이 있으면 그것, 없으면 글자 자체. */
+    fun idKey(pkg: String, viewId: String) = "$pkg|id:$viewId"
+    fun textKey(pkg: String, text: String) = "$pkg|text:$text"
+
+    /**
+     * @param titleKeys 사용자가 "제목 맞음"으로 고정한 자리. 이 앱에 하나라도 있으면 그 자리만 본다.
+     * @param blockKeys 사용자가 "아님"으로 막은 자리/글자.
+     */
+    fun find(
+        root: AccessibilityNodeInfo,
+        screenH: Int,
+        pkg: String,
+        titleKeys: Set<String> = emptySet(),
+        blockKeys: Set<String> = emptySet(),
+    ): Candidate? {
+        val pinned = titleKeys.any { it.startsWith("$pkg|") }
+        var best: Candidate? = null
         var bestScore = 0
         val topLimit = (screenH * 0.2).toInt()
         val r = Rect()
@@ -54,17 +72,26 @@ object TitleFinder {
             val web = inWeb || (n.className?.toString()?.contains("WebView") == true)
             val text = n.text?.toString()?.replace(SPACES, " ")?.trim()
             if (!web && !text.isNullOrEmpty() && n.isVisibleToUser && looksLikeTitle(text)) {
-                n.getBoundsInScreen(r)
-                val id = n.viewIdResourceName?.lowercase().orEmpty()
-                var s = 0
-                if ("title" in id) s += 100
-                if ("chapter" in id || "toc" in id || "section" in id || "subtitle" in id) s -= 80
-                if (r.top in 0 until topLimit) s += 40
-                if (s > 0) {
-                    s += minOf(text.length, 30)
-                    if (s > bestScore) {
-                        bestScore = s
-                        best = text
+                val rawId = n.viewIdResourceName.orEmpty()
+                val blocked = textKey(pkg, text) in blockKeys ||
+                    (rawId.isNotEmpty() && idKey(pkg, rawId) in blockKeys)
+                if (!blocked) {
+                    var s = 0
+                    if (pinned) {
+                        if (rawId.isNotEmpty() && idKey(pkg, rawId) in titleKeys) s = 1000
+                    } else {
+                        n.getBoundsInScreen(r)
+                        val id = rawId.lowercase()
+                        if ("title" in id) s += 100
+                        if ("chapter" in id || "toc" in id || "section" in id || "subtitle" in id) s -= 80
+                        if (r.top in 0 until topLimit) s += 40
+                    }
+                    if (s > 0) {
+                        s += minOf(text.length, 30)
+                        if (s > bestScore) {
+                            bestScore = s
+                            best = Candidate(text, rawId)
+                        }
                     }
                 }
             }

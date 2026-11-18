@@ -162,6 +162,12 @@
             android:textColor="#333333"
             android:textSize="13sp" />
 
+        <Button
+            android:id="@+id/btnClearCache"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="보관된 표지 모두 지우기 (잘못 저장된 표지 정리)" />
+
         <ImageView
             android:id="@+id/preview"
             android:layout_width="match_parent"

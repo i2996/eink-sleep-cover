@@ -85,6 +85,17 @@ class MainActivity : Activity() {
                 search(d.first)
             }
         }
+        findViewById<Button>(R.id.btnClearCache).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setMessage("기기에 보관된 표지를 모두 지울까요?\n(지금 슬립 화면 이미지는 그대로 둬요)")
+                .setPositiveButton("지우기") { _, _ ->
+                    CoverCache.clear(this)
+                    Prefs.setAttempted(this, "")
+                    refresh()
+                }
+                .setNegativeButton("취소", null)
+                .show()
+        }
         findViewById<Button>(R.id.btnSearch).setOnClickListener { search(editQuery.text.toString()) }
         editQuery.setOnEditorActionListener { _, id, _ ->
             if (id == EditorInfo.IME_ACTION_SEARCH) {

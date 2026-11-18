@@ -31,4 +31,8 @@ object CoverCache {
     fun has(c: Context, title: String) = title.isNotBlank() && file(c, title).exists()
 
     fun count(c: Context) = dir(c).listFiles()?.size ?: 0
+
+    fun clear(c: Context) {
+        dir(c).listFiles()?.forEach { it.delete() }
+    }
 }

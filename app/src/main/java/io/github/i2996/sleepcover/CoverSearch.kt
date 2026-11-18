@@ -4,7 +4,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.URLEncoder
 
-data class Book(val title: String, val author: String, val coverUrl: String)
+/** [exact]: 서점이 알려 준 실제 책 제목인지 (false면 검색어를 제목 자리에 넣은 것). */
+data class Book(val title: String, val author: String, val coverUrl: String, val exact: Boolean = true)
 
 /** 책 제목으로 표지 이미지를 찾는다. 알라딘 API(키 있을 때) → 알라딘·예스24·교보 웹 검색 → Google 도서 순. */
 object CoverSearch {
@@ -88,13 +89,13 @@ object CoverSearch {
         val seen = HashSet<String>()
         for (block in html.split("ss_book_box").drop(1)) {
             val img = ALADIN_IMG.findAll(block).map { it.value }.firstOrNull { "/cover" in it } ?: continue
-            val title = ALADIN_TITLE.find(block)?.groupValues?.get(1)?.let(::unescape).orEmpty().ifEmpty { q }
-            if (seen.add(img)) books += Book(title, "알라딘", https(img))
+            val title = ALADIN_TITLE.find(block)?.groupValues?.get(1)?.let(::unescape).orEmpty()
+            if (seen.add(img)) books += Book(title.ifEmpty { q }, "알라딘", https(img), exact = title.isNotEmpty())
             if (books.size >= 10) break
         }
         if (books.isEmpty()) {
             ALADIN_IMG.findAll(html).map { it.value }.filter { "/cover" in it }.distinct().take(10)
-                .forEach { books += Book(q, "", https(it)) }
+                .forEach { books += Book(q, "", https(it), exact = false) }
         }
         return books
     }
@@ -108,7 +109,7 @@ object CoverSearch {
         val titles = YES24_TITLE.findAll(html).map { unescape(it.groupValues[1]) }.toList()
         val sameCount = titles.size == ids.size
         return ids.mapIndexed { i, id ->
-            Book(if (sameCount) titles[i] else q, "예스24", "https://image.yes24.com/goods/$id/XL")
+            Book(if (sameCount) titles[i] else q, "예스24", "https://image.yes24.com/goods/$id/XL", exact = sameCount)
         }
     }
 
@@ -117,7 +118,7 @@ object CoverSearch {
     private fun searchKyobo(q: String): List<Book> {
         val html = Http.text("https://search.kyobobook.co.kr/search?keyword=${enc(q)}&gbCode=TOT&target=total")
         return KYOBO_IMG.findAll(html).map { it.groupValues[1] }.distinct().take(10).map {
-            Book(q, "교보문고", "https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/$it.jpg")
+            Book(q, "교보문고", "https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/$it.jpg", exact = false)
         }.toList()
     }
 

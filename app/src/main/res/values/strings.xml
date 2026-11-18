@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">슬립 표지</string>
+    <string name="share_label">슬립 표지로 지정</string>
+    <string name="a11y_desc">고른 독서 앱(리디, 교보, 밀리 등)이 화면에 띄운 책 제목을 읽어서, 그 책 표지를 슬립(대기) 화면 이미지로 바꿉니다. 화면 내용은 저장하거나 보내지 않으며, 표지 검색을 위해 책 제목만 알라딘(또는 Google 도서)에 보냅니다.</string>
+</resources>

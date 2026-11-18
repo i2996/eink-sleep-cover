@@ -6,7 +6,7 @@ import java.net.URLEncoder
 
 data class Book(val title: String, val author: String, val coverUrl: String)
 
-/** 책 제목으로 표지 이미지를 찾는다. 알라딘 API(키 있을 때) → 알라딘 웹 검색 → Google 도서 순. */
+/** 책 제목으로 표지 이미지를 찾는다. 알라딘 API(키 있을 때) → 알라딘·예스24·교보 웹 검색 → Google 도서 순. */
 object CoverSearch {
     private val COVER_SIZE = Regex("""/cover(sum|\d+)/""")
 
@@ -25,12 +25,21 @@ object CoverSearch {
                 errors += "알라딘 API: ${e.message}"
             }
         }
-        try {
-            val r = searchAladinWeb(q)
-            if (r.isNotEmpty()) return r
-        } catch (e: Exception) {
-            errors += "알라딘: ${e.message}"
+        // 키 없이 되는 서점 검색들을 모두 돌려서 결과를 합친다 (한 곳이 막혀도 다른 곳에서 찾게).
+        val merged = mutableListOf<Book>()
+        val sources = listOf<Pair<String, (String) -> List<Book>>>(
+            "알라딘" to { s: String -> searchAladinWeb(s) },
+            "예스24" to { s: String -> searchYes24(s) },
+            "교보" to { s: String -> searchKyobo(s) },
+        )
+        for ((name, fn) in sources) {
+            try {
+                merged += fn(q).take(6)
+            } catch (e: Exception) {
+                errors += "$name: ${e.message}"
+            }
         }
+        if (merged.isNotEmpty()) return merged.distinctBy { it.coverUrl }
         try {
             val r = searchGoogle(q)
             if (r.isNotEmpty()) return r
@@ -80,7 +89,7 @@ object CoverSearch {
         for (block in html.split("ss_book_box").drop(1)) {
             val img = ALADIN_IMG.findAll(block).map { it.value }.firstOrNull { "/cover" in it } ?: continue
             val title = ALADIN_TITLE.find(block)?.groupValues?.get(1)?.let(::unescape).orEmpty().ifEmpty { q }
-            if (seen.add(img)) books += Book(title, "", https(img))
+            if (seen.add(img)) books += Book(title, "알라딘", https(img))
             if (books.size >= 10) break
         }
         if (books.isEmpty()) {
@@ -88,6 +97,28 @@ object CoverSearch {
                 .forEach { books += Book(q, "", https(it)) }
         }
         return books
+    }
+
+    private val YES24_IMG = Regex("""image\.yes24\.com/goods/(\d+)/""")
+    private val YES24_TITLE = Regex("""class="gd_name"[^>]*>([^<]+)""")
+
+    private fun searchYes24(q: String): List<Book> {
+        val html = Http.text("https://www.yes24.com/Product/Search?domain=ALL&query=${enc(q)}")
+        val ids = YES24_IMG.findAll(html).map { it.groupValues[1] }.distinct().take(10).toList()
+        val titles = YES24_TITLE.findAll(html).map { unescape(it.groupValues[1]) }.toList()
+        val sameCount = titles.size == ids.size
+        return ids.mapIndexed { i, id ->
+            Book(if (sameCount) titles[i] else q, "예스24", "https://image.yes24.com/goods/$id/XL")
+        }
+    }
+
+    private val KYOBO_IMG = Regex("""contents\.kyobobook\.co\.kr/sih/fit-in/\d+x0/pdt/([0-9A-Za-z_-]+)\.jpg""")
+
+    private fun searchKyobo(q: String): List<Book> {
+        val html = Http.text("https://search.kyobobook.co.kr/search?keyword=${enc(q)}&gbCode=TOT&target=total")
+        return KYOBO_IMG.findAll(html).map { it.groupValues[1] }.distinct().take(10).map {
+            Book(q, "교보문고", "https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/$it.jpg")
+        }.toList()
     }
 
     private fun searchGoogle(q: String): List<Book> {

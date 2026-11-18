@@ -6,8 +6,9 @@ import java.net.URL
 import java.nio.charset.Charset
 
 object Http {
+    // PC 브라우저처럼 접속해야 서점들이 모바일 사이트(구조가 다름)로 돌려보내지 않는다.
     private const val UA =
-        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
     fun bytes(url: String): ByteArray {
         var current = url
@@ -17,6 +18,7 @@ object Http {
             conn.readTimeout = 15_000
             conn.instanceFollowRedirects = false
             conn.setRequestProperty("User-Agent", UA)
+            conn.setRequestProperty("Accept-Language", "ko-KR,ko;q=0.9")
             try {
                 val code = conn.responseCode
                 if (code in 300..399) {

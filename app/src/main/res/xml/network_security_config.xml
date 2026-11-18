@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 서점 사이트가 표지 검색 중 http:// 주소로 돌려보내는 경우가 있어 이 도메인만 허용한다. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">aladin.co.kr</domain>
+        <domain includeSubdomains="true">yes24.com</domain>
+        <domain includeSubdomains="true">kyobobook.co.kr</domain>
+    </domain-config>
+</network-security-config>

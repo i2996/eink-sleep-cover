@@ -3,6 +3,7 @@ package io.github.i2996.sleepcover
 import android.accessibilityservice.AccessibilityService
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
 
@@ -18,6 +19,12 @@ class SleepCoverService : AccessibilityService() {
 
     @Volatile
     private var working = false
+
+    @Volatile
+    private var failedTitle: String? = null
+
+    @Volatile
+    private var failedAt = 0L
 
     private val scan = Runnable {
         scanScheduled = false
@@ -47,6 +54,8 @@ class SleepCoverService : AccessibilityService() {
         Prefs.setDetected(this, title, pkg)
         if (!Prefs.auto(this)) return
         if (title == Prefs.attempted(this) || title == pendingTitle) return
+        // 인터넷이 없어서 실패한 책은 1분마다만 다시 시도한다.
+        if (title == failedTitle && SystemClock.uptimeMillis() - failedAt < 60_000) return
         pendingTitle = title
         main.removeCallbacks(applyPending)
         main.postDelayed(applyPending, 4000)
@@ -60,19 +69,29 @@ class SleepCoverService : AccessibilityService() {
         val ctx = applicationContext
         Thread {
             val msg = try {
-                val book = CoverSearch.search(title, Prefs.ttbKey(ctx)).firstOrNull()
-                if (book == null) {
-                    "‘$title’ 표지를 찾지 못했어요"
-                } else {
-                    CoverWriter.apply(ctx, book.coverUrl, title)
+                if (CoverWriter.applyCached(ctx, title) != null) {
                     "슬립 표지: $title"
+                } else {
+                    val book = CoverSearch.search(title, Prefs.ttbKey(ctx)).firstOrNull()
+                    if (book == null) {
+                        "‘$title’ 표지를 찾지 못했어요"
+                    } else {
+                        CoverWriter.apply(ctx, book.coverUrl, title)
+                        "슬립 표지: $title"
+                    }
                 }
             } catch (e: Exception) {
-                "슬립 표지 실패: ${e.message}"
+                // 와이파이가 없을 때 등: 나중에 다시 시도하도록 기록을 지운다.
+                Prefs.setAttempted(ctx, "")
+                val firstFailure = failedTitle != title
+                failedTitle = title
+                failedAt = SystemClock.uptimeMillis()
+                // 같은 책에서 1분마다 실패 알림이 뜨지 않게 처음 한 번만 알린다.
+                if (firstFailure) "슬립 표지 실패 (와이파이 연결되면 다시 시도해요): ${e.message}" else null
             } finally {
                 working = false
             }
-            main.post { Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show() }
+            if (msg != null) main.post { Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show() }
         }.start()
     }
 

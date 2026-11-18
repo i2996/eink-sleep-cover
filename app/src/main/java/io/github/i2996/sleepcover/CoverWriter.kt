@@ -35,9 +35,23 @@ object CoverWriter {
             ctx.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
 
-    fun apply(ctx: Context, coverUrl: String, title: String): File {
+    /** 표지를 받아 슬립 이미지로 저장하고, [title]과 [alsoCacheAs] 제목으로 기기에 보관한다. */
+    fun apply(ctx: Context, coverUrl: String, title: String, alsoCacheAs: List<String> = emptyList()): File {
         if (!canWrite(ctx)) throw IOException("저장 권한(모든 파일 접근)이 없어요")
-        val src = download(coverUrl)
+        val (bytes, src) = download(coverUrl)
+        (listOf(title) + alsoCacheAs).distinct().forEach { CoverCache.put(ctx, it, bytes) }
+        return write(ctx, src, title)
+    }
+
+    /** 기기에 보관된 표지가 있으면 인터넷 없이 슬립 이미지로 저장한다. 없으면 null. */
+    fun applyCached(ctx: Context, title: String): File? {
+        if (!canWrite(ctx)) throw IOException("저장 권한(모든 파일 접근)이 없어요")
+        val bytes = CoverCache.get(ctx, title) ?: return null
+        val src = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        return write(ctx, src, title)
+    }
+
+    private fun write(ctx: Context, src: Bitmap, title: String): File {
         val (w, h) = screenSize(ctx)
         val bmp = compose(src, w, h, Prefs.fill(ctx), Prefs.gray(ctx))
         val file = outputFile(ctx)
@@ -52,12 +66,12 @@ object CoverWriter {
         return file
     }
 
-    private fun download(url: String): Bitmap {
+    private fun download(url: String): Pair<ByteArray, Bitmap> {
         var last: Exception? = null
         for (u in listOf(CoverSearch.bigCover(url), url).distinct()) {
             try {
                 val b = Http.bytes(u)
-                BitmapFactory.decodeByteArray(b, 0, b.size)?.let { return it }
+                BitmapFactory.decodeByteArray(b, 0, b.size)?.let { return b to it }
             } catch (e: Exception) {
                 last = e
             }

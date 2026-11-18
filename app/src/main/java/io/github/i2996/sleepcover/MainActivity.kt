@@ -275,8 +275,10 @@ class MainActivity : Activity() {
         savePrefs()
         searchStatus.text = "슬립 이미지 만드는 중…"
         val ctx = applicationContext
+        // 자동 감지된 제목으로도 보관해서, 다음에 그 책을 열면 와이파이 없이도 바로 바뀌게 한다.
+        val detected = listOfNotNull(Prefs.detected(ctx)?.first, editQuery.text.toString().trim())
         Thread {
-            val r = runCatching { CoverWriter.apply(ctx, book.coverUrl, book.title) }
+            val r = runCatching { CoverWriter.apply(ctx, book.coverUrl, book.title, detected) }
             main.post {
                 if (isFinishing) return@post
                 r.onSuccess { f ->
@@ -292,7 +294,8 @@ class MainActivity : Activity() {
     private fun loadPreview() {
         val f = CoverWriter.outputFile(this)
         val applied = Prefs.applied(this)
-        pathText.text = (if (applied.isNotEmpty()) "$applied\n" else "") + f.path
+        pathText.text = (if (applied.isNotEmpty()) "$applied\n" else "") + f.path +
+            "\n기기에 보관된 표지: ${CoverCache.count(this)}개 (와이파이 없이 바로 바뀜)"
         if (!CoverWriter.canWrite(this)) return
         Thread {
             val bmp: Bitmap? = try {

@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
@@ -75,6 +76,19 @@ class MainActivity : Activity() {
 
         btnStorage.setOnClickListener { requestStorage() }
         btnA11y.setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        // Boox처럼 앱 정보 화면을 바꿔 놓은 기기에서도 안드로이드 원래 화면(⋮ 메뉴 있음)을 연다.
+        findViewById<Button>(R.id.btnAppInfo).setOnClickListener {
+            val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+            try {
+                startActivity(i.setClassName("com.android.settings", "com.android.settings.applications.InstalledAppDetails"))
+            } catch (e: Exception) {
+                try {
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                } catch (e2: Exception) {
+                    toast("앱 정보 화면을 열 수 없어요")
+                }
+            }
+        }
         findViewById<Button>(R.id.btnReaders).setOnClickListener { pickReaders() }
         findViewById<Button>(R.id.btnUseDetected).setOnClickListener {
             val d = Prefs.detected(this)
@@ -152,6 +166,7 @@ class MainActivity : Activity() {
             append(if (a11y) "✓ 접근성 서비스 켜짐" else "✗ 접근성 서비스 꺼짐 (자동 감지 안 됨)")
         }
         btnStorage.text = if (storage) "1. 저장 권한 ✓" else "1. 저장 권한 허용하기"
+        findViewById<Button>(R.id.btnAppInfo).visibility = if (a11y) View.GONE else View.VISIBLE
         btnA11y.text = if (a11y) "2. 접근성 서비스 ✓" else "2. 접근성 서비스 켜기 ('슬립 표지')"
 
         val names = Prefs.readers(this).mapNotNull { appLabel(it) }.sorted()

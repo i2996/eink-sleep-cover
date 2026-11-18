@@ -30,6 +30,13 @@
             android:layout_height="wrap_content" />
 
         <Button
+            android:id="@+id/btnAppInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="2-1. 접근성이 막히면: 앱 정보 열기 (⋮ → 제한된 설정 허용)"
+            android:textSize="13sp" />
+
+        <Button
             android:id="@+id/btnReaders"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

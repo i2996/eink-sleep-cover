@@ -137,6 +137,10 @@ class SleepCoverService : AccessibilityService() {
             RemoteKeys.Action.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
             RemoteKeys.Action.REFRESH -> flashRefresh()
             RemoteKeys.Action.WIFI -> startWifiToggle()
+            RemoteKeys.Action.SLEEP -> {
+                val ok = Build.VERSION.SDK_INT >= 28 && performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+                if (!ok) Toast.makeText(this, "이 기기에서는 화면을 잠글 수 없어요", Toast.LENGTH_SHORT).show()
+            }
             RemoteKeys.Action.BLOCK -> {}
         }
     }

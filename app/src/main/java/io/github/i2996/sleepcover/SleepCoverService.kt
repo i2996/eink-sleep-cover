@@ -211,6 +211,7 @@ class SleepCoverService : AccessibilityService() {
      */
     private fun flashRefresh() {
         if (flashing) return
+        if (booxRefresh()) return
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val v = View(this).apply { setBackgroundColor(Color.BLACK) }
         val lp = WindowManager.LayoutParams(
@@ -226,17 +227,44 @@ class SleepCoverService : AccessibilityService() {
         try {
             wm.addView(v, lp)
         } catch (e: Exception) {
+            Toast.makeText(this, "새로고침 화면을 띄우지 못했어요: ${e.message}", Toast.LENGTH_LONG).show()
             return
         }
         flashing = true
-        main.postDelayed({ v.setBackgroundColor(Color.WHITE) }, 400)
+        main.postDelayed({ v.setBackgroundColor(Color.WHITE) }, 600)
         main.postDelayed({
             try {
                 wm.removeView(v)
             } catch (e: Exception) {
             }
             flashing = false
-        }, 800)
+        }, 1200)
+    }
+
+    /**
+     * Boox(오닉스) 기기의 자체 전체 새로고침을 부른다.
+     * 오닉스 SDK가 쓰는 숨은 기능(View.repaintEverything)을 찾아 호출하고, 없으면 false.
+     */
+    private fun booxRefresh(): Boolean {
+        val isBoox = listOf(Build.MANUFACTURER, Build.BRAND).any {
+            it?.contains("onyx", ignoreCase = true) == true || it?.contains("boox", ignoreCase = true) == true
+        }
+        if (!isBoox) return false
+        return try {
+            val view = View::class.java
+            val mode = listOf("UI_GC_MODE", "EINK_GC_MODE", "UI_GC4_MODE").firstNotNullOfOrNull { name ->
+                try {
+                    view.getField(name).getInt(null)
+                } catch (e: Throwable) {
+                    null
+                }
+            } ?: return false
+            val m = view.getMethod("repaintEverything", Int::class.javaPrimitiveType)
+            m.invoke(null, mode)
+            true
+        } catch (e: Throwable) {
+            false
+        }
     }
 
     private fun tap(x: Float, y: Float) {

@@ -38,7 +38,7 @@ object RemoteKeys {
     fun setEnabled(c: Context, v: Boolean) = sp(c).edit().putBoolean("remoteOn", v).apply()
 
     /** 새로고침 속도: 이름과 검정/하양 한 단계 시간(ms). */
-    val REFRESH_SPEEDS = listOf("빠르게" to 250L, "보통" to 600L, "확실하게" to 900L)
+    val REFRESH_SPEEDS = listOf("빠르게" to 250L, "보통" to 400L, "확실하게" to 700L)
 
     fun refreshSpeed(c: Context) = sp(c).getInt("refreshSpeed", 1).coerceIn(0, REFRESH_SPEEDS.size - 1)
     fun setRefreshSpeed(c: Context, v: Int) = sp(c).edit().putInt("refreshSpeed", v).apply()

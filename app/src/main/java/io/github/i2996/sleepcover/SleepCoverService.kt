@@ -232,7 +232,8 @@ class SleepCoverService : AccessibilityService() {
             return
         }
         flashing = true
-        main.postDelayed({ v.setBackgroundColor(Color.WHITE) }, 600)
+        val step = RemoteKeys.refreshStepMs(this)
+        main.postDelayed({ v.setBackgroundColor(Color.WHITE) }, step)
         main.postDelayed({
             try {
                 wm.removeView(v)
@@ -241,7 +242,7 @@ class SleepCoverService : AccessibilityService() {
             flashing = false
             // 원래 화면이 돌아온 뒤 한 번 더 전체 새로고침을 요청한다.
             main.postDelayed({ booxRefresh() }, 150)
-        }, 1200)
+        }, step * 2)
     }
 
     /**

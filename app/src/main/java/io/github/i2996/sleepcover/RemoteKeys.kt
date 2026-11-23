@@ -37,6 +37,13 @@ object RemoteKeys {
     fun enabled(c: Context) = sp(c).getBoolean("remoteOn", true)
     fun setEnabled(c: Context, v: Boolean) = sp(c).edit().putBoolean("remoteOn", v).apply()
 
+    /** 새로고침 속도: 이름과 검정/하양 한 단계 시간(ms). */
+    val REFRESH_SPEEDS = listOf("빠르게" to 250L, "보통" to 600L, "확실하게" to 900L)
+
+    fun refreshSpeed(c: Context) = sp(c).getInt("refreshSpeed", 1).coerceIn(0, REFRESH_SPEEDS.size - 1)
+    fun setRefreshSpeed(c: Context, v: Int) = sp(c).edit().putInt("refreshSpeed", v).apply()
+    fun refreshStepMs(c: Context) = REFRESH_SPEEDS[refreshSpeed(c)].second
+
     /** 저장 형식: "키코드=동작" 또는 "키코드=LAUNCH_APP|패키지" 를 ';'로 이음. */
     fun map(c: Context): Map<Int, Binding> =
         sp(c).getString("keymap", "")!!.split(';').filter { '=' in it }.mapNotNull {

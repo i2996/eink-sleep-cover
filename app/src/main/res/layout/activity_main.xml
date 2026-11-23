@@ -204,6 +204,12 @@
             android:text="독서 앱에서 리모컨 버튼 바꾸기" />
 
         <Button
+            android:id="@+id/btnRefreshSpeed"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp" />
+
+        <Button
             android:id="@+id/btnLearnKey"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

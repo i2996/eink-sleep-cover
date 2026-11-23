@@ -108,6 +108,15 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, v -> RemoteKeys.setEnabled(this@MainActivity, v) }
         }
         findViewById<Button>(R.id.btnLearnKey).setOnClickListener { learnKey() }
+        findViewById<Button>(R.id.btnRefreshSpeed).apply {
+            fun label() = "새로고침 속도: ${RemoteKeys.REFRESH_SPEEDS[RemoteKeys.refreshSpeed(this@MainActivity)].first} (눌러서 바꾸기)"
+            text = label()
+            setOnClickListener {
+                val next = (RemoteKeys.refreshSpeed(this@MainActivity) + 1) % RemoteKeys.REFRESH_SPEEDS.size
+                RemoteKeys.setRefreshSpeed(this@MainActivity, next)
+                text = label()
+            }
+        }
 
         findViewById<Button>(R.id.btnClearRules).setOnClickListener {
             AlertDialog.Builder(this)

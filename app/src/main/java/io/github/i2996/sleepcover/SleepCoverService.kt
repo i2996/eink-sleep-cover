@@ -211,7 +211,8 @@ class SleepCoverService : AccessibilityService() {
      */
     private fun flashRefresh() {
         if (flashing) return
-        if (booxRefresh()) return
+        // Boox 자체 새로고침은 호출이 성공해도 실제로 안 될 수 있어(팔마2), 깜빡임과 함께 쓴다.
+        booxRefresh()
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val v = View(this).apply { setBackgroundColor(Color.BLACK) }
         val lp = WindowManager.LayoutParams(
@@ -238,6 +239,8 @@ class SleepCoverService : AccessibilityService() {
             } catch (e: Exception) {
             }
             flashing = false
+            // 원래 화면이 돌아온 뒤 한 번 더 전체 새로고침을 요청한다.
+            main.postDelayed({ booxRefresh() }, 150)
         }, 1200)
     }
 

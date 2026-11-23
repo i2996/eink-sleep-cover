@@ -41,3 +41,13 @@ jobs:
             --target "${{ github.sha }}" \
             --title "최신 빌드 #${{ github.run_number }}" \
             --notes "기기 브라우저에서 eink-sleep-cover.apk 를 받아 설치하세요."
+          # gh가 초안(draft)으로 남겨 두는 경우가 있어 확실히 공개한다.
+          gh release edit latest --draft=false --latest
+          # 기기가 실제로 받을 수 있는지 확인 (로그인 없이)
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+            [ "$code" = "200" ] && break
+            sleep 5
+          done
+          echo "public release check: $code"
+          [ "$code" = "200" ]

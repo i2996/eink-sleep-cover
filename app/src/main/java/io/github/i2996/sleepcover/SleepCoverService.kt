@@ -1,9 +1,12 @@
 package io.github.i2996.sleepcover
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
 
@@ -28,6 +31,8 @@ class SleepCoverService : AccessibilityService() {
     @Volatile
     private var working = false
 
+    private var foregroundPkg: String? = null
+
     @Volatile
     private var failedTitle: String? = null
 
@@ -46,6 +51,8 @@ class SleepCoverService : AccessibilityService() {
 
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val cls = event.className?.toString()
+            // 리모컨 버튼은 지금 앞에 떠 있는 앱이 독서 앱일 때만 바꾼다.
+            if (!isOverlay(pkg) || pkg == packageName) foregroundPkg = pkg
             if (!isReader) {
                 if (!isOverlay(pkg)) unlock()
                 return
@@ -64,6 +71,62 @@ class SleepCoverService : AccessibilityService() {
             scanScheduled = true
             main.postDelayed(scan, 800)
         }
+    }
+
+    /**
+     * 리모컨(블루투스 키) 처리.
+     * - 앱 화면이 버튼을 배우는 중이면 그쪽으로 넘긴다.
+     * - 독서 앱이 앞에 있고 연결된 동작이 있으면 그 동작을 하고 원래 키는 막는다.
+     */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        RemoteKeys.learner?.let { learn ->
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) main.post { learn(code) }
+            return true
+        }
+        if (!RemoteKeys.enabled(this)) return false
+        val fg = foregroundPkg ?: return false
+        if (fg !in Prefs.readers(this)) return false
+        val action = RemoteKeys.map(this)[code] ?: return false
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) perform(action)
+        return true
+    }
+
+    private fun perform(action: RemoteKeys.Action) {
+        val dm = RemoteKeys.screenSize(this)
+        val w = dm.first.toFloat()
+        val h = dm.second.toFloat()
+        when (action) {
+            RemoteKeys.Action.NEXT -> tap(w * 0.85f, h * 0.5f)
+            RemoteKeys.Action.PREV -> tap(w * 0.15f, h * 0.5f)
+            RemoteKeys.Action.MENU -> tap(w * 0.5f, h * 0.5f)
+            RemoteKeys.Action.SWIPE_NEXT -> swipe(w * 0.8f, h * 0.5f, w * 0.2f, h * 0.5f)
+            RemoteKeys.Action.SWIPE_PREV -> swipe(w * 0.2f, h * 0.5f, w * 0.8f, h * 0.5f)
+            RemoteKeys.Action.SCROLL_DOWN -> swipe(w * 0.5f, h * 0.7f, w * 0.5f, h * 0.3f)
+            RemoteKeys.Action.SCROLL_UP -> swipe(w * 0.5f, h * 0.3f, w * 0.5f, h * 0.7f)
+            RemoteKeys.Action.BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
+            RemoteKeys.Action.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
+            RemoteKeys.Action.BLOCK -> {}
+        }
+    }
+
+    private fun tap(x: Float, y: Float) {
+        val path = Path().apply { moveTo(x, y) }
+        dispatchGesture(
+            GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 50)).build(),
+            null, null,
+        )
+    }
+
+    private fun swipe(x1: Float, y1: Float, x2: Float, y2: Float) {
+        val path = Path().apply {
+            moveTo(x1, y1)
+            lineTo(x2, y2)
+        }
+        dispatchGesture(
+            GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 250)).build(),
+            null, null,
+        )
     }
 
     /** 상단바·키보드·알림처럼 독서 화면 위에 잠깐 뜨는 것들은 화면 이동으로 보지 않는다. */

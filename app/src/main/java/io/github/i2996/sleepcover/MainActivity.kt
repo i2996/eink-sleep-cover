@@ -102,6 +102,12 @@ class MainActivity : Activity() {
                 search(d.first)
             }
         }
+        findViewById<CheckBox>(R.id.chkRemote).apply {
+            isChecked = RemoteKeys.enabled(this@MainActivity)
+            setOnCheckedChangeListener { _, v -> RemoteKeys.setEnabled(this@MainActivity, v) }
+        }
+        findViewById<Button>(R.id.btnLearnKey).setOnClickListener { learnKey() }
+
         findViewById<Button>(R.id.btnClearRules).setOnClickListener {
             AlertDialog.Builder(this)
                 .setMessage("'제목 맞음'/'아님'으로 가르친 내용을 모두 지울까요?")
@@ -191,7 +197,94 @@ class MainActivity : Activity() {
         else "최근 감지된 제목: ${d.first}\n(${appLabel(d.second) ?: d.second})"
 
         showRecent()
+        showKeys()
         loadPreview()
+    }
+
+    override fun onDestroy() {
+        RemoteKeys.learner = null
+        super.onDestroy()
+    }
+
+    /** 리모컨 버튼을 한 번 눌러 받고, 그 버튼에 붙일 동작을 고르게 한다. */
+    private fun learnKey() {
+        if (!a11yEnabled()) {
+            toast("먼저 2번 접근성 서비스를 켜 주세요")
+            return
+        }
+        var done = false
+        lateinit var waiting: AlertDialog
+        val onKey: (Int) -> Unit = { code ->
+            if (!done) {
+                done = true
+                RemoteKeys.learner = null
+                waiting.dismiss()
+                chooseAction(code)
+            }
+        }
+        waiting = AlertDialog.Builder(this)
+            .setTitle("버튼 배우기")
+            .setMessage("리모컨에서 바꾸고 싶은 버튼을 한 번 눌러 주세요.")
+            .setNegativeButton("취소") { _, _ -> RemoteKeys.learner = null }
+            // 접근성 서비스가 키를 못 받는 경우를 대비해 이 창에서도 받는다.
+            .setOnKeyListener { _, code, ev ->
+                if (code == android.view.KeyEvent.KEYCODE_BACK) return@setOnKeyListener false
+                if (ev.action == android.view.KeyEvent.ACTION_DOWN) onKey(code)
+                true
+            }
+            .setOnDismissListener { if (!done) RemoteKeys.learner = null }
+            .create()
+        RemoteKeys.learner = onKey
+        waiting.show()
+    }
+
+    private fun chooseAction(code: Int) {
+        val actions = RemoteKeys.Action.values()
+        AlertDialog.Builder(this)
+            .setTitle("‘${RemoteKeys.keyName(code)}’ 버튼을 누르면")
+            .setItems(actions.map { it.label }.toTypedArray()) { _, i ->
+                RemoteKeys.put(this, code, actions[i])
+                showKeys()
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun showKeys() {
+        val list = findViewById<LinearLayout>(R.id.keyList)
+        list.removeAllViews()
+        val map = RemoteKeys.map(this)
+        if (map.isEmpty()) {
+            list.addView(TextView(this).apply {
+                text = "아직 설정한 버튼이 없어요."
+                setTextColor(Color.DKGRAY)
+            })
+            return
+        }
+        for ((code, action) in map.entries.sortedBy { it.key }) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            row.addView(TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setTextColor(Color.BLACK)
+                textSize = 15f
+                text = "${RemoteKeys.keyName(code)} → ${action.label}"
+            })
+            row.addView(Button(this).apply {
+                text = "변경"
+                setOnClickListener { chooseAction(code) }
+            })
+            row.addView(Button(this).apply {
+                text = "삭제"
+                setOnClickListener {
+                    RemoteKeys.remove(this@MainActivity, code)
+                    showKeys()
+                }
+            })
+            list.addView(row)
+        }
     }
 
     /** 감지 기록과 '제목 맞음 / 아님' 버튼. */

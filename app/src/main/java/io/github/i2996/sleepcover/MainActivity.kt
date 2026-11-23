@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -214,12 +215,27 @@ class MainActivity : Activity() {
         }
         var done = false
         lateinit var waiting: AlertDialog
-        val onKey: (Int) -> Unit = { code ->
+        // viaService=false: 접근성 서비스가 키를 못 받아서 이 창이 대신 받은 경우
+        val onKey: (Int, Boolean) -> Unit = { code, viaService ->
             if (!done) {
                 done = true
                 RemoteKeys.learner = null
                 waiting.dismiss()
-                chooseAction(code)
+                if (viaService) {
+                    chooseAction(code)
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("리모컨 신호가 접근성으로 안 들어와요")
+                        .setMessage(
+                            "이대로면 독서 앱에서 리모컨 버튼이 바뀌지 않아요.\n\n" +
+                                "설정 → 접근성 → 슬립 표지를 껐다가 다시 켠 뒤, 버튼을 다시 배워 주세요."
+                        )
+                        .setPositiveButton("접근성 설정 열기") { _, _ ->
+                            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }
+                        .setNegativeButton("그래도 저장") { _, _ -> chooseAction(code) }
+                        .show()
+                }
             }
         }
         waiting = AlertDialog.Builder(this)
@@ -229,13 +245,27 @@ class MainActivity : Activity() {
             // 접근성 서비스가 키를 못 받는 경우를 대비해 이 창에서도 받는다.
             .setOnKeyListener { _, code, ev ->
                 if (code == android.view.KeyEvent.KEYCODE_BACK) return@setOnKeyListener false
-                if (ev.action == android.view.KeyEvent.ACTION_DOWN) onKey(code)
+                if (ev.action == android.view.KeyEvent.ACTION_DOWN) onKey(code, false)
                 true
             }
             .setOnDismissListener { if (!done) RemoteKeys.learner = null }
             .create()
-        RemoteKeys.learner = onKey
+        RemoteKeys.learner = { code -> onKey(code, true) }
         waiting.show()
+        // L2/R2 트리거·십자키 중에는 키가 아니라 아날로그(축) 신호를 보내는 것이 있다. 그런 건 바꿀 수 없음을 알린다.
+        var warnedAxis = false
+        waiting.window?.decorView?.setOnGenericMotionListener { _, ev ->
+            val axes = listOf(
+                MotionEvent.AXIS_LTRIGGER, MotionEvent.AXIS_RTRIGGER, MotionEvent.AXIS_BRAKE,
+                MotionEvent.AXIS_GAS, MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y,
+            )
+            val moved = axes.any { kotlin.math.abs(ev.getAxisValue(it)) > 0.5f }
+            if (moved && !warnedAxis && !done) {
+                warnedAxis = true
+                toast("이 버튼은 키가 아니라 아날로그(축) 신호를 보내서 바꿀 수 없어요")
+            }
+            moved
+        }
     }
 
     private fun chooseAction(code: Int) {

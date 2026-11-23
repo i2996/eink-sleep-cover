@@ -97,7 +97,12 @@ class SleepCoverService : AccessibilityService() {
         if (!RemoteKeys.enabled(this)) return false
         val binding = RemoteKeys.map(this)[code] ?: return false
         if (!binding.anywhere) {
-            val fg = foregroundPkg ?: return false
+            // 지금 화면의 앱을 직접 확인하고, 안 되면 마지막으로 본 앞쪽 앱을 쓴다.
+            val fg = try {
+                rootInActiveWindow?.packageName?.toString()
+            } catch (e: Exception) {
+                null
+            } ?: foregroundPkg ?: return false
             if (fg !in Prefs.readers(this)) return false
         }
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) perform(binding)

@@ -243,7 +243,32 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("‘${RemoteKeys.keyName(code)}’ 버튼을 누르면")
             .setItems(actions.map { it.label }.toTypedArray()) { _, i ->
-                RemoteKeys.put(this, code, actions[i])
+                if (actions[i] == RemoteKeys.Action.LAUNCH_APP) {
+                    chooseApp(code)
+                } else {
+                    RemoteKeys.put(this, code, RemoteKeys.Binding(actions[i]))
+                    showKeys()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun launcherApps(): List<Pair<String, String>> {
+        val pm = packageManager
+        return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .filter { it.first != packageName }
+            .distinctBy { it.first }
+            .sortedBy { it.second }
+    }
+
+    private fun chooseApp(code: Int) {
+        val apps = launcherApps()
+        AlertDialog.Builder(this)
+            .setTitle("‘${RemoteKeys.keyName(code)}’ 버튼으로 열 앱")
+            .setItems(apps.map { it.second }.toTypedArray()) { _, i ->
+                RemoteKeys.put(this, code, RemoteKeys.Binding(RemoteKeys.Action.LAUNCH_APP, apps[i].first))
                 showKeys()
             }
             .setNegativeButton("취소", null)
@@ -261,7 +286,7 @@ class MainActivity : Activity() {
             })
             return
         }
-        for ((code, action) in map.entries.sortedBy { it.key }) {
+        for ((code, binding) in map.entries.sortedBy { it.key }) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -270,7 +295,7 @@ class MainActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 setTextColor(Color.BLACK)
                 textSize = 15f
-                text = "${RemoteKeys.keyName(code)} → ${action.label}"
+                text = "${RemoteKeys.keyName(code)} → ${RemoteKeys.label(this@MainActivity, binding)}"
             })
             row.addView(Button(this).apply {
                 text = "변경"

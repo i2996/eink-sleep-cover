@@ -2,6 +2,7 @@ package io.github.i2996.sleepcover
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -89,18 +90,32 @@ class SleepCoverService : AccessibilityService() {
             return true
         }
         if (!RemoteKeys.enabled(this)) return false
-        val fg = foregroundPkg ?: return false
-        if (fg !in Prefs.readers(this)) return false
-        val action = RemoteKeys.map(this)[code] ?: return false
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) perform(action)
+        val binding = RemoteKeys.map(this)[code] ?: return false
+        if (!binding.anywhere) {
+            val fg = foregroundPkg ?: return false
+            if (fg !in Prefs.readers(this)) return false
+        }
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) perform(binding)
         return true
     }
 
-    private fun perform(action: RemoteKeys.Action) {
+    private fun perform(binding: RemoteKeys.Binding) {
         val dm = RemoteKeys.screenSize(this)
         val w = dm.first.toFloat()
         val h = dm.second.toFloat()
-        when (action) {
+        when (binding.action) {
+            RemoteKeys.Action.LAUNCH_APP -> {
+                val i = packageManager.getLaunchIntentForPackage(binding.pkg)
+                if (i == null) {
+                    Toast.makeText(this, "앱을 찾을 수 없어요: ${binding.pkg}", Toast.LENGTH_SHORT).show()
+                } else {
+                    try {
+                        startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "앱을 열 수 없어요: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
             RemoteKeys.Action.NEXT -> tap(w * 0.85f, h * 0.5f)
             RemoteKeys.Action.PREV -> tap(w * 0.15f, h * 0.5f)
             RemoteKeys.Action.MENU -> tap(w * 0.5f, h * 0.5f)

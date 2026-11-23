@@ -12,7 +12,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.os.Build
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 
 /**
@@ -52,6 +55,8 @@ class SleepCoverService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
+        // 와이파이 설정 창이 뜨면 스위치를 찾아 누른다.
+        if (wifiPendingUntil > 0L && !wifiClicked) main.postDelayed({ tryClickWifiSwitch() }, 300)
         val isReader = pkg in Prefs.readers(this)
 
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -126,8 +131,71 @@ class SleepCoverService : AccessibilityService() {
             RemoteKeys.Action.BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
             RemoteKeys.Action.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
             RemoteKeys.Action.REFRESH -> flashRefresh()
+            RemoteKeys.Action.WIFI -> startWifiToggle()
             RemoteKeys.Action.BLOCK -> {}
         }
+    }
+
+    // ── 와이파이 켜기/끄기 ──
+    // 안드로이드 10+에서는 앱이 와이파이를 직접 못 바꾸므로,
+    // 와이파이 설정 창을 띄우고 그 안의 스위치를 대신 누른 뒤 창을 닫는다.
+    private var wifiPendingUntil = 0L
+    private var wifiClicked = false
+
+    private fun startWifiToggle() {
+        wifiClicked = false
+        wifiPendingUntil = SystemClock.uptimeMillis() + 6000
+        val intents = mutableListOf<Intent>()
+        if (Build.VERSION.SDK_INT >= 29) intents += Intent(Settings.Panel.ACTION_WIFI)
+        intents += Intent(Settings.ACTION_WIFI_SETTINGS)
+        for (i in intents) {
+            try {
+                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                main.postDelayed({ tryClickWifiSwitch() }, 700)
+                return
+            } catch (e: Exception) {
+            }
+        }
+        wifiPendingUntil = 0
+        Toast.makeText(this, "와이파이 설정을 열 수 없어요", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun tryClickWifiSwitch() {
+        if (wifiClicked || wifiPendingUntil == 0L) return
+        if (SystemClock.uptimeMillis() > wifiPendingUntil) {
+            wifiPendingUntil = 0
+            Toast.makeText(this, "와이파이 스위치를 찾지 못했어요", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val root = try {
+            rootInActiveWindow
+        } catch (e: Exception) {
+            null
+        } ?: return
+        if (root.packageName?.toString()?.contains("settings", ignoreCase = true) != true) return
+        val sw = findSwitch(root) ?: return
+        val target = generateSequence(sw) { it.parent }.firstOrNull { it.isClickable } ?: return
+        wifiClicked = true
+        wifiPendingUntil = 0
+        val wasOn = sw.isChecked
+        target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        main.postDelayed({
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            Toast.makeText(this, if (wasOn) "와이파이 껐어요" else "와이파이 켰어요", Toast.LENGTH_SHORT).show()
+        }, 700)
+    }
+
+    private fun findSwitch(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.addLast(root)
+        var seen = 0
+        while (queue.isNotEmpty() && seen < 400) {
+            val n = queue.removeFirst()
+            seen++
+            if (n.isCheckable && n.className?.toString()?.contains("Switch") == true) return n
+            for (i in 0 until n.childCount) n.getChild(i)?.let { queue.addLast(it) }
+        }
+        return null
     }
 
     private var flashing = false

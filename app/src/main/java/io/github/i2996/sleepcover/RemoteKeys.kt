@@ -18,6 +18,7 @@ object RemoteKeys {
         MENU("메뉴 열기 (가운데 탭)"),
         REFRESH("화면 새로고침 (잔상 지우기)"),
         LAUNCH_APP("앱 열기 (어디서든)"),
+        WIFI("와이파이 켜기/끄기 (어디서든)"),
         BACK("뒤로 가기"),
         HOME("홈 화면"),
         BLOCK("아무것도 안 함 (버튼 막기)"),
@@ -25,8 +26,8 @@ object RemoteKeys {
 
     /** 버튼 하나의 설정. [pkg]는 LAUNCH_APP일 때 열 앱. */
     data class Binding(val action: Action, val pkg: String = "") {
-        /** 앱 열기는 어디서든, 나머지는 독서 앱이 앞에 있을 때만. */
-        val anywhere get() = action == Action.LAUNCH_APP
+        /** 앱 열기·와이파이는 어디서든, 나머지는 독서 앱이 앞에 있을 때만. */
+        val anywhere get() = action == Action.LAUNCH_APP || action == Action.WIFI
     }
 
     /** 배우기 모드: 앱 화면이 리모컨 버튼을 기다리는 중이면 여기로 키 코드를 넘긴다. */

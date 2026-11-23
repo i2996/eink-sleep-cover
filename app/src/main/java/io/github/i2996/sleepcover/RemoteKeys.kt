@@ -16,6 +16,7 @@ object RemoteKeys {
         SCROLL_DOWN("아래로 스크롤"),
         SCROLL_UP("위로 스크롤"),
         MENU("메뉴 열기 (가운데 탭)"),
+        REFRESH("화면 새로고침 (잔상 지우기)"),
         BACK("뒤로 가기"),
         HOME("홈 화면"),
         BLOCK("아무것도 안 함 (버튼 막기)"),

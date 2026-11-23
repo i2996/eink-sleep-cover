@@ -2,7 +2,11 @@ package io.github.i2996.sleepcover
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.graphics.Color
 import android.graphics.Path
+import android.graphics.PixelFormat
+import android.view.View
+import android.view.WindowManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -106,8 +110,45 @@ class SleepCoverService : AccessibilityService() {
             RemoteKeys.Action.SCROLL_UP -> swipe(w * 0.5f, h * 0.3f, w * 0.5f, h * 0.7f)
             RemoteKeys.Action.BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
             RemoteKeys.Action.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
+            RemoteKeys.Action.REFRESH -> flashRefresh()
             RemoteKeys.Action.BLOCK -> {}
         }
+    }
+
+    private var flashing = false
+
+    /**
+     * 전자잉크 잔상 지우기: 화면 전체를 잠깐 검게 → 하얗게 덮었다가 걷어서
+     * 화면 전체가 다시 그려지게 한다 (기기 종류와 상관없이 동작).
+     */
+    private fun flashRefresh() {
+        if (flashing) return
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val v = View(this).apply { setBackgroundColor(Color.BLACK) }
+        val lp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.OPAQUE,
+        )
+        try {
+            wm.addView(v, lp)
+        } catch (e: Exception) {
+            return
+        }
+        flashing = true
+        main.postDelayed({ v.setBackgroundColor(Color.WHITE) }, 400)
+        main.postDelayed({
+            try {
+                wm.removeView(v)
+            } catch (e: Exception) {
+            }
+            flashing = false
+        }, 800)
     }
 
     private fun tap(x: Float, y: Float) {
